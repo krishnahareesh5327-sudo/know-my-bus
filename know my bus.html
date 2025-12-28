@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Know My Bus — Board or Wait</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --ink:#1f2937; --bg:#f6f8fb; --card:#ffffff; --muted:#6b7280;
+      --accent:#2563eb; --safe:#16a34a; --warn:#f59e0b; --danger:#dc2626;
+      --line:#e5e7eb;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Segoe UI,system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink)}
+    header{background:linear-gradient(180deg,#0f172a,#1e293b);color:#fff;padding:28px 20px;text-align:center}
+    header h1{margin:0;font-weight:600;letter-spacing:.2px}
+    header p{margin:6px 0 0;color:#cbd5e1}
+    main{max-width:920px;margin:0 auto;padding:24px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 6px 20px rgba(15,23,42,.06);padding:18px;margin-bottom:18px}
+    label{font-size:.9rem;color:var(--muted)}
+    input{width:100%;padding:12px 12px;border:1px solid var(--line);border-radius:10px;margin-top:6px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    button{appearance:none;border:none;background:var(--accent);color:#fff;padding:12px 16px;border-radius:10px;cursor:pointer;font-weight:600}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    .subtle{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+    .bus{border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:12px}
+    .bus h3{margin:0 0 6px 0;font-size:1rem}
+    .meta{display:flex;flex-wrap:wrap;gap:12px;margin:8px 0}
+    .chip{font-size:.85rem;color:#0b1220;border:1px dashed var(--line);padding:6px 10px;border-radius:999px;background:#fafafa}
+    .badge{font-size:.85rem;padding:6px 10px;border-radius:999px;color:#fff}
+    .badge.safe{background:var(--safe)}
+    .badge.warn{background:var(--warn)}
+    .badge.danger{background:var(--danger)}
+    .timeline{margin-top:10px;border-left:2px solid var(--line);padding-left:12px}
+    .stop{margin:8px 0}
+    .stop small{color:var(--muted)}
+    .details{margin-top:10px;padding:10px;border-radius:10px;background:#f9fafb;border:1px solid var(--line);display:none}
+    .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}
+    .confidence{font-size:.85rem;color:var(--muted)}
+    .footer{color:#6b7280;text-align:center;padding:18px}
+  </style>
+</head>
+<body>
+<header>
+  <h1>Know My Bus</h1>
+  <p>Smart decisions before boarding</p>
+</header>
+
+<main>
+  <div class="card">
+    <h2 style="margin:0 0 8px 0">Route finder</h2>
+    <p style="margin:0;color:#64748b">Enter boarding and dropping. We’ll tell you whether to board now or wait.</p>
+    <div class="row" style="margin-top:12px">
+      <div>
+        <label>Boarding at</label>
+        <input id="boarding" placeholder="e.g., Gajuwaka" value="Gajuwaka" />
+      </div>
+      <div>
+        <label>Dropping at</label>
+        <input id="dropping" placeholder="e.g., Visakhapatnam" value="Visakhapatnam" />
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button id="findBtn">Find my bus</button>
+      <button class="subtle" id="refreshBtn" disabled>Refresh live status</button>
+    </div>
+    <p id="helper" class="confidence" style="margin-top:8px">Tip: Try “Gajuwaka” → “Visakhapatnam”.</p>
+  </div>
+
+  <div class="card" id="results" aria-live="polite">
+    <h2 style="margin:0 0 8px 0">Recommended options</h2>
+    <p class="confidence" style="margin:0">We evaluate crowd, comfort and proximity, then suggest a simple action.</p>
+    <!-- Bus cards injected here -->
+  </div>
+
+  <div class="footer">Know My Bus Prototype — Simulated data, decision-focused flow</div>
+</main>
+
+<script>
+  const STOPS = [
+    {name:"Steel Plant", landmark:"Near plant gate"},
+    {name:"Kurmannapalem", landmark:"Crossed Duvvada Arch"},
+    {name:"NAD Junction", landmark:"Signal cleared"},
+    {name:"Gopalapatnam", landmark:"Bridge approach"},
+    {name:"Gajuwaka", landmark:"Main circle"},
+    {name:"Scindia", landmark:"Dock road"},
+    {name:"Akkayyapalem", landmark:"Community hall"},
+    {name:"Maddilapalem", landmark:"RTC Complex"},
+    {name:"Visakhapatnam", landmark:"RK Beach"}
+  ];
+
+  const SIM_BUSES = [
+    {id:"City 101", headwayMin:6, startIdx:0, speedStopsPerMin:0.45},
+    {id:"City 202", headwayMin:8, startIdx:2, speedStopsPerMin:0.40},
+    {id:"City 303", headwayMin:10, startIdx:1, speedStopsPerMin:0.50}
+  ];
+
+  let tick = 0;
+  let interval;
+  const state = { active: [], boardingIdx: null, droppingIdx: null };
+
+  function mapIndex(place){
+    const p = place?.toLowerCase()?.trim();
+    return STOPS.findIndex(s => s.name.toLowerCase() === p);
+  }
+
+  function simulateTicketRate(bus, posIdx){
+    // higher rate near dense hubs; emulate crowd as tickets per minute
+    const hubBoost = [4,6,7].includes(posIdx) ? 1.4 : 1.0;
+    const base = 10 + (bus.headwayMin * 0.8);
+    const wave = 6 + 4*Math.sin((tick/3)+(posIdx));
+    return Math.max(6, Math.round((base + wave) * hubBoost));
+  }
+
+  function toComfort(tpm){
+    // Translate tickets/min to comfort
+    if (tpm <= 12) return {label:"Seats available", badge:"safe"};
+    if (tpm <= 18) return {label:"Standing okay", badge:"warn"};
+    return {label:"Crowded — avoid", badge:"danger"};
+  }
+
+  function distanceMeters(fromIdx, toIdx){
+    const stops = Math.max(0, toIdx - fromIdx);
+    return stops * 350 + Math.floor(Math.random()*50); // 350m per stop avg
+  }
+
+  function minutesAway(meters){
+    return Math.max(1, Math.round(meters / 280)); // ~280m/min walking pace proxy
+  }
+
+  function confidence(tpm, meters){
+    const c = 100 - Math.abs(18 - tpm)*2 - Math.min(40, meters/10);
+    if (c >= 70) return {label:"High confidence", value: c};
+    if (c >= 45) return {label:"Medium confidence", value: c};
+    return {label:"Low confidence", value: c};
+  }
+
+  function decide(comfortBadge, meters, boardingIdx, posIdx){
+    const approaching = posIdx < boardingIdx;
+    if (!approaching) return {action:"Wait for next", reason:"Bus passed your stop"};
+    if (comfortBadge === "safe" && meters < 900) return {action:"Board now", reason:"Seats likely and close"};
+    if (comfortBadge === "warn" && meters < 600) return {action:"Board now (if okay to stand)", reason:"Standing probable, bus nearby"};
+    if (comfortBadge === "danger" && meters < 1000) return {action:"Wait for next", reason:"Crowded at this time"};
+    return {action:"Consider alternate stop", reason:"Better odds at nearby hub"};
+  }
+
+  function render(){
+    const container = document.getElementById("results");
+    // wipe previous bus cards
+    container.querySelectorAll(".bus").forEach(b => b.remove());
+
+    state.active.forEach(bus => {
+      const posIdx = Math.min(STOPS.length-1, bus.startIdx + Math.floor(tick * bus.speedStopsPerMin));
+      const boardingIdx = state.boardingIdx;
+      const droppingIdx = state.droppingIdx;
+
+      const tpm = simulateTicketRate(bus, posIdx);
+      const comfort = toComfort(tpm);
+      const meters = distanceMeters(posIdx, boardingIdx);
+      const etaMin = minutesAway(meters);
+      const conf = confidence(tpm, meters);
+      const decision = decide(comfort.badge, meters, boardingIdx, posIdx);
+
+      const card = document.createElement("div");
+      card.className = "bus";
+      card.innerHTML = `
+        <h3>${bus.id} <span class="chip">Headway ~${bus.headwayMin} min</span></h3>
+        <div class="meta">
+          <span class="badge ${comfort.badge}">${decision.action}</span>
+          <span class="chip"><strong>Comfort:</strong> ${comfort.label}</span>
+          <span class="chip"><strong>Distance:</strong> ${meters} m</span>
+          <span class="chip"><strong>ETA:</strong> ${etaMin} min</span>
+          <span class="chip"><strong>Confidence:</strong> ${conf.label}</span>
+        </div>
+        <div class="timeline">
+          <div class="stop"><strong>Now:</strong> ${STOPS[posIdx].name} <small>— ${STOPS[posIdx].landmark}</small></div>
+          <div class="stop"><strong>Approaching:</strong> ${STOPS[Math.min(STOPS.length-1,posIdx+1)].name}</div>
+          <div class="stop"><strong>Your stop:</strong> ${STOPS[boardingIdx].name}</div>
+          <div class="stop"><strong>Destination:</strong> ${STOPS[droppingIdx].name}</div>
+        </div>
+        <button class="subtle" data-id="${bus.id}">Show details</button>
+        <div class="details">
+          <p><strong>Why this recommendation:</strong> ${decision.reason}.</p>
+          <p class="confidence">Tickets/min (simulated): ~${tpm}. Higher near hubs; we translate this to comfort.</p>
+          <p class="confidence">We estimate location by stop progression; refresh to simulate live movement.</p>
+        </div>
+      `;
+      container.appendChild(card);
+
+      card.querySelector("button").addEventListener("click", () => {
+        const d = card.querySelector(".details");
+        d.style.display = d.style.display === "none" || !d.style.display ? "block" : "none";
+        card.querySelector("button").textContent = d.style.display === "block" ? "Hide details" : "Show details";
+      });
+    });
+  }
+
+  function startFlow(){
+    tick = 0;
+    state.active = JSON.parse(JSON.stringify(SIM_BUSES));
+    render();
+    enableRefresh(true);
+    if (interval) clearInterval(interval);
+    interval = setInterval(() => { tick += 1; render(); }, 3500); // gentle live feel
+  }
+
+  function enableRefresh(on){
+    document.getElementById("refreshBtn").disabled = !on;
+  }
+
+  document.getElementById("findBtn").addEventListener("click", () => {
+    const b = document.getElementById("boarding").value;
+    const d = document.getElementById("dropping").value;
+    const bi = mapIndex(b);
+    const di = mapIndex(d);
+    const helper = document.getElementById("helper");
+
+    if (bi === -1 || di === -1 || bi >= di){
+      helper.textContent = "Enter valid stops with boarding before destination (e.g., Gajuwaka → Visakhapatnam).";
+      enableRefresh(false);
+      document.getElementById("results").querySelectorAll(".bus").forEach(b => b.remove());
+      if (interval) clearInterval(interval);
+      return;
+    }
+    state.boardingIdx = bi;
+    state.droppingIdx = di;
+    helper.textContent = "Evaluating incoming services… calm guidance over raw data.";
+    startFlow();
+  });
+
+  document.getElementById("refreshBtn").addEventListener("click", () => {
+    tick += 1;
+    render();
+  });
+</script>
+</body>
+</html>
