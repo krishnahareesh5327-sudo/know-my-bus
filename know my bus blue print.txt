@@ -1,0 +1,87 @@
+Project Blueprint: "Know My Bus"
+Client Vision: A frictionless, crowdsourced public transit tracking system.
+
+1. Platform & Accessibility
+Platform: Web-based (Browser). No app download required.
+
+Target Audience: General public/Commuters.
+
+Philosophy: Simple, effective, and automated.
+
+2. The Data Engine (Crowdsourcing)
+Source: Passenger mobile GPS data.
+
+Processing: The system will average the data points from multiple passengers on the same bus to determine a single, accurate "Centroid" location for the bus icon.
+
+Validation (Option C): Automated Route Matching. The system must compare passenger movement against known bus route polylines to automatically identify which bus they are on.
+
+3. Key User Features
+Live Map: Real-time visualization of bus icons moving along routes.
+
+Search & Find: Search by bus number or destination; GPS-based "nearest stop" locator.
+
+Dual Display (Option C): Provide both a live visual map and a calculated ETA (Estimated Time of Arrival) in minutes.
+
+Route Geometry: Visual polylines showing the fixed path of each bus route.
+
+4. Technical Requirements for Developer "X"
+Backend: Real-time data processing (WebSockets or Firebase) to handle constant GPS pings.
+
+Algorithm: Implementation of a "Speed + Path" filter to distinguish bus passengers from pedestrians or cars.
+
+Optimization: Aggregation logic to ensure that 10 people on one bus do not appear as 10 separate icons.
+
+Privacy: Ensure GPS data is used anonymously and only for the duration of the trip.
+
+
+
+
+
+
+
+Project Title: Know My Bus (Prototype) Client Vision: A web-based, crowdsourced bus tracking and seat-availability predictor.
+
+1. The "Intro" (UX):
+
+Splash: A high-quality 1-second "Know My Bus" animation upon loading.
+
+Interface: A simple "From Station" and "To Station" search view.
+
+2. The Simulation (The Logic):
+
+Realistic Data: Use real Andhra Pradesh city names, stops, and bus route numbers.
+
+Crowdsourcing Simulation: The system should act as if it is taking GPS data from passengers and averaging it to show a smooth bus movement on the map.
+
+Auto-Detection: Simulate the logic where the app "realizes" a user is on a bus based on their movement path.
+
+3. The "Flash" Notification & Query:
+
+The Trigger: A simulated flash notification pops up while the "passenger" is using other apps.
+
+The 5-Option Query: A quick-tap menu to report bus status:
+
+💺 Seats Available (Green)
+
+👤 Half-Full
+
+🧍 Standing Only
+
+👨‍👩‍👦 Very Crowded (Red)
+
+🚦 Heavy Traffic
+
+Smart Advice: If the next bus is "Very Crowded," the UI should highlight a later bus and say: "Wait for the next bus for a comfortable seat."
+
+4. Technical Note for Person X:
+
+This is a Web-based Prototype (No app install).
+
+Use Mock Data for the bus locations but make the movement patterns realistic.
+
+Focus on the UI/UX transition from the search screen to the "Advice" screen.
+
+What’s next?
+We have built the full blueprint. There is no more confusion left—the developer knows the platform, the logic, the local context, and the goal.
+
+Would you like me to write a formal "Opening Message" that you can send to Person X to officially start the project?
